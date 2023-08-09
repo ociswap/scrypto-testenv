@@ -17,7 +17,7 @@ mod test {
 
     #[test]
     fn test_swap_with_remainder() {
-        swap_expect_success(DEC_10, dec!(1), dec!(2), dec!(1), dec!(1))
+        swap_expect_success(DEC_10, dec!(3), dec!(5), dec!(1), dec!(2))
     }
 
     #[test]
