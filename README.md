@@ -52,7 +52,7 @@ Allowing you to focus on the things which matter - your test case parameters and
 
 For more examples see the test files:
 - [Test Instantiate](examples/hello_swap/tests/test_instantiate.rs)
-- [Test Swap](examples/hello_swap/tests/test_swap.rs.rs)
+- [Test Swap](examples/hello_swap/tests/test_swap.rs)
 
 ## Contribute
 We are looking forward to your feedback and contributions. Additionally, this is work in progress and not fully polished in general and things might change over time.
