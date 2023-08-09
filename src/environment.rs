@@ -168,19 +168,19 @@ pub trait TestHelperExecution {
         }
     }
 
-    fn execute_success(&mut self, verbose: bool) -> Receipt {
+    fn execute_expect_success(&mut self, verbose: bool) -> Receipt {
         let receipt = self.execute(verbose);
         receipt.execution_receipt.expect_commit_success();
         receipt
     }
 
-    fn execute_failure(&mut self, verbose: bool) -> Receipt {
+    fn execute_expect_failure(&mut self, verbose: bool) -> Receipt {
         let receipt = self.execute(verbose);
         receipt.execution_receipt.expect_commit_failure();
         receipt
     }
 
-    fn execute_rejection(&mut self, verbose: bool) -> Receipt {
+    fn execute_expect_rejection(&mut self, verbose: bool) -> Receipt {
         let receipt = self.execute(verbose);
         receipt.execution_receipt.expect_rejection();
         receipt
