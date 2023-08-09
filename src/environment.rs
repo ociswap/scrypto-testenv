@@ -7,6 +7,8 @@ use scrypto_unit::TestRunner;
 use std::{mem, path::Path};
 use transaction::{builder::ManifestBuilder, prelude::*};
 
+use crate::MAX_SUPPLY;
+
 #[macro_export]
 macro_rules! nft_ids {
     ($($x:expr),*) => {
@@ -20,12 +22,6 @@ macro_rules! nft_ids {
     };
 }
 
-pub const MAX_SUPPLY: Decimal = Decimal(BnumI256::from_digits([
-    12919594847110692864,
-    54210108624275221,
-    0,
-    0,
-])); // 1000000000000000000
 const INSTRUCTION_COUNTER_INIT: usize = 1; // lock_standard_test_fee will be added always as first instruction automatically
 
 pub enum TestAddress {
@@ -123,12 +119,12 @@ impl TestEnvironment {
         &mut self,
         label: &str,
         instruction_count: usize,
-        local_instruction_id: usize,
+        label_instruction_id: usize,
     ) {
         self.instruction_ids_by_label
             .entry(label.to_string())
             .or_default()
-            .push(self.instruction_counter + local_instruction_id);
+            .push(self.instruction_counter + label_instruction_id);
         self.instruction_counter += instruction_count;
     }
 }
