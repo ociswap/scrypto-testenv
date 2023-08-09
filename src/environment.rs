@@ -39,7 +39,7 @@ pub struct TestEnvironment {
 
     pub package_address: PackageAddress,
     pub public_key: Secp256k1PublicKey,
-    pub account_component: ComponentAddress,
+    pub account: ComponentAddress,
 
     pub admin_badge_address: ResourceAddress,
     pub a_address: ResourceAddress,
@@ -62,43 +62,43 @@ impl TestEnvironment {
     {
         let mut test_runner = TestRunner::builder().without_trace().build();
 
-        let (public_key, _private_key, account_component) = test_runner.new_allocated_account();
+        let (public_key, _private_key, account) = test_runner.new_allocated_account();
         let package_address = test_runner.compile_and_publish(package_dir);
-        let manifest_builder = ManifestBuilder::new().lock_standard_test_fee(account_component);
+        let manifest_builder = ManifestBuilder::new().lock_standard_test_fee(account);
 
         let admin_badge_address =
-            test_runner.create_fungible_resource(dec!(1), DIVISIBILITY_NONE, account_component);
+            test_runner.create_fungible_resource(dec!(1), DIVISIBILITY_NONE, account);
         let a_address = test_runner.create_fungible_resource(
             MAX_SUPPLY,
             DIVISIBILITY_MAXIMUM,
-            account_component,
+            account,
         );
         let b_address = test_runner.create_fungible_resource(
             MAX_SUPPLY,
             DIVISIBILITY_MAXIMUM,
-            account_component,
+            account,
         );
         let (x_address, y_address) = sort_addresses(a_address, b_address);
 
         let u_address = test_runner.create_fungible_resource(
             dec!(1000000000),
             DIVISIBILITY_MAXIMUM,
-            account_component,
+            account,
         );
         let v_address = test_runner.create_fungible_resource(
             dec!(10000000),
             DIVISIBILITY_MAXIMUM,
-            account_component,
+            account,
         );
-        let j_nft_address = test_runner.create_non_fungible_resource(account_component);
-        let k_nft_address = test_runner.create_non_fungible_resource(account_component);
+        let j_nft_address = test_runner.create_non_fungible_resource(account);
+        let k_nft_address = test_runner.create_non_fungible_resource(account);
 
         Self {
             test_runner,
             manifest_builder,
             package_address,
             public_key,
-            account_component,
+            account,
 
             admin_badge_address,
             a_address,
@@ -133,7 +133,7 @@ pub trait TestHelperExecution {
     fn environment(&mut self) -> &mut TestEnvironment;
 
     fn execute(&mut self, verbose: bool) -> Receipt {
-        let account_component = self.environment().account_component;
+        let account_component = self.environment().account;
         let public_key = self.environment().public_key;
         let manifest_builder = mem::replace(
             &mut self.environment().manifest_builder,
@@ -160,7 +160,7 @@ pub trait TestHelperExecution {
             ManifestBuilder::new(),
         );
         self.environment().manifest_builder =
-            manifest_builder.lock_standard_test_fee(self.environment().account_component);
+            manifest_builder.lock_standard_test_fee(self.environment().account);
         Receipt {
             execution_receipt,
             preview_receipt,
