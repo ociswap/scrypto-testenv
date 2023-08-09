@@ -81,7 +81,7 @@ impl HelloSwapTestHelper {
         verbose: bool,
     ) -> Receipt {
         self.instantiate(self.x_address(), self.y_address(), y_amount, price);
-        let receipt = self.execute_success(verbose);
+        let receipt = self.execute_expect_success(verbose);
         let (pool_address, price): (ComponentAddress, Decimal) = receipt.outputs("instantiate")[0];
         self.pool_address = Some(pool_address);
         self.price = Some(price);
@@ -89,7 +89,7 @@ impl HelloSwapTestHelper {
     }
 
     pub fn swap_expect_failure(&mut self, x_amount: Decimal) {
-        self.swap(self.x_address(), x_amount).execute_failure(true);
+        self.swap(self.x_address(), x_amount).execute_expect_failure(true);
     }
 
     pub fn swap_expect_success(
@@ -98,7 +98,7 @@ impl HelloSwapTestHelper {
         y_amount_expected: Decimal,
         x_remainder_expected: Decimal,
     ) {
-        let receipt = self.swap(self.x_address(), x_amount).execute_success(true);
+        let receipt = self.swap(self.x_address(), x_amount).execute_expect_success(true);
         let output_buckets = receipt.output_buckets("swap");
 
         assert_eq!(
@@ -152,7 +152,7 @@ pub fn instantiate_expect_failure(y_amount: Decimal, price: Decimal) {
     let mut helper = HelloSwapTestHelper::new();
     helper
         .instantiate(helper.x_address(), helper.y_address(), y_amount, price)
-        .execute_failure(true);
+        .execute_expect_failure(true);
 }
 
 pub fn swap_expect_success(
