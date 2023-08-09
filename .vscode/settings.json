@@ -4,6 +4,7 @@
         "editor.defaultFormatter": "rust-lang.rust-analyzer",
     },
     "rust-analyzer.linkedProjects": [
+        "./Cargo.toml",
         "./examples/hello_swap/Cargo.toml"
     ],
 }
