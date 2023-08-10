@@ -5,6 +5,7 @@
     },
     "rust-analyzer.linkedProjects": [
         "./Cargo.toml",
-        "./examples/hello_swap/Cargo.toml"
+        "./examples/hello_swap/Cargo.toml",
+        "./examples/execution-preview-test/Cargo.toml"
     ],
 }
