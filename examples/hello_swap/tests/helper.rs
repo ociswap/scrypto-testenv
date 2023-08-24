@@ -5,15 +5,11 @@ use radix_engine::{
 };
 use scrypto::prelude::*;
 use scrypto_testenv::*;
-use scrypto_unit::TestRunner;
 use std::mem;
 use transaction::builder::ManifestBuilder;
 
 lazy_static! {
-    static ref PACKAGE: (Vec<u8>, PackageDefinition) = TestRunner::builder()
-        .without_trace()
-        .build()
-        .compile(this_package!());
+    static ref PACKAGE: (Vec<u8>, PackageDefinition) = compile_package(this_package!());
 }
 
 impl TestHelperExecution for HelloSwapTestHelper {

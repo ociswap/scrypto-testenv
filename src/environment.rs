@@ -56,6 +56,13 @@ pub struct TestEnvironment {
     instruction_ids_by_label: HashMap<String, Vec<usize>>,
 }
 
+pub fn compile_package<P: AsRef<Path>>(package_dir: P) -> (Vec<u8>, PackageDefinition) {
+    TestRunner::builder()
+        .without_trace()
+        .build()
+        .compile(package_dir)
+}
+
 impl TestEnvironment {
     pub fn new(package: &(Vec<u8>, PackageDefinition)) -> Self {
         let mut test_runner = TestRunner::builder().without_trace().build();
