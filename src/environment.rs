@@ -1,4 +1,5 @@
 use radix_engine::{
+    blueprints::package::PackageDefinition,
     system::system_modules::execution_trace::{ResourceSpecifier, WorktopChange},
     transaction::TransactionReceipt,
 };
@@ -56,40 +57,30 @@ pub struct TestEnvironment {
 }
 
 impl TestEnvironment {
-    pub fn new<P>(package_dir: P) -> Self
-    where
-        P: AsRef<Path>,
-    {
+    pub fn new(package: &(Vec<u8>, PackageDefinition)) -> Self {
         let mut test_runner = TestRunner::builder().without_trace().build();
 
         let (public_key, _private_key, account) = test_runner.new_allocated_account();
-        let package_address = test_runner.compile_and_publish(package_dir);
+        let package_address = test_runner.publish_package(
+            package.0.clone(),
+            package.1.clone(),
+            BTreeMap::new(),
+            OwnerRole::None,
+        );
         let manifest_builder = ManifestBuilder::new().lock_standard_test_fee(account);
 
         let admin_badge_address =
             test_runner.create_fungible_resource(dec!(1), DIVISIBILITY_NONE, account);
-        let a_address = test_runner.create_fungible_resource(
-            MAX_SUPPLY,
-            DIVISIBILITY_MAXIMUM,
-            account,
-        );
-        let b_address = test_runner.create_fungible_resource(
-            MAX_SUPPLY,
-            DIVISIBILITY_MAXIMUM,
-            account,
-        );
+        let a_address =
+            test_runner.create_fungible_resource(MAX_SUPPLY, DIVISIBILITY_MAXIMUM, account);
+        let b_address =
+            test_runner.create_fungible_resource(MAX_SUPPLY, DIVISIBILITY_MAXIMUM, account);
         let (x_address, y_address) = sort_addresses(a_address, b_address);
 
-        let u_address = test_runner.create_fungible_resource(
-            dec!(1000000000),
-            DIVISIBILITY_MAXIMUM,
-            account,
-        );
-        let v_address = test_runner.create_fungible_resource(
-            dec!(10000000),
-            DIVISIBILITY_MAXIMUM,
-            account,
-        );
+        let u_address =
+            test_runner.create_fungible_resource(dec!(1000000000), DIVISIBILITY_MAXIMUM, account);
+        let v_address =
+            test_runner.create_fungible_resource(dec!(10000000), DIVISIBILITY_MAXIMUM, account);
         let j_nft_address = test_runner.create_non_fungible_resource(account);
         let k_nft_address = test_runner.create_non_fungible_resource(account);
 

@@ -1,8 +1,20 @@
-use radix_engine::system::system_modules::execution_trace::ResourceSpecifier::Amount;
+use lazy_static::lazy_static;
+use radix_engine::{
+    blueprints::package::PackageDefinition,
+    system::system_modules::execution_trace::ResourceSpecifier::Amount,
+};
 use scrypto::prelude::*;
 use scrypto_testenv::*;
+use scrypto_unit::TestRunner;
 use std::mem;
 use transaction::builder::ManifestBuilder;
+
+lazy_static! {
+    static ref PACKAGE: (Vec<u8>, PackageDefinition) = TestRunner::builder()
+        .without_trace()
+        .build()
+        .compile(this_package!());
+}
 
 impl TestHelperExecution for HelloSwapTestHelper {
     fn environment(&mut self) -> &mut TestEnvironment {
@@ -18,7 +30,7 @@ pub struct HelloSwapTestHelper {
 
 impl HelloSwapTestHelper {
     pub fn new() -> HelloSwapTestHelper {
-        let environment = TestEnvironment::new(this_package!());
+        let environment = TestEnvironment::new(&PACKAGE);
 
         HelloSwapTestHelper {
             env: environment,
@@ -89,7 +101,8 @@ impl HelloSwapTestHelper {
     }
 
     pub fn swap_expect_failure(&mut self, x_amount: Decimal) {
-        self.swap(self.x_address(), x_amount).execute_expect_failure(true);
+        self.swap(self.x_address(), x_amount)
+            .execute_expect_failure(true);
     }
 
     pub fn swap_expect_success(
@@ -98,7 +111,9 @@ impl HelloSwapTestHelper {
         y_amount_expected: Decimal,
         x_remainder_expected: Decimal,
     ) {
-        let receipt = self.swap(self.x_address(), x_amount).execute_expect_success(true);
+        let receipt = self
+            .swap(self.x_address(), x_amount)
+            .execute_expect_success(true);
         let output_buckets = receipt.output_buckets("swap");
 
         assert_eq!(
