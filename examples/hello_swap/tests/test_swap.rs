@@ -4,7 +4,7 @@ use helper::*;
 
 // The following tests serve as examples and are not comprehensive by any means
 
-const DEC_10: Decimal = Decimal(BnumI256::from_digits([10000000000000000000, 0, 0, 0]));
+const DEC_10: Decimal = Decimal(I192::from_digits([10000000000000000000, 0, 0]));
 
 #[cfg(test)]
 mod test {
