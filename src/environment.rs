@@ -2,9 +2,11 @@ use radix_engine::{
     blueprints::package::PackageDefinition,
     system::system_modules::execution_trace::{ResourceSpecifier, WorktopChange},
     transaction::TransactionReceipt,
+    vm::NoExtension,
 };
+use radix_engine_stores::memory_db::InMemorySubstateDatabase;
 use scrypto::prelude::*;
-use scrypto_unit::TestRunner;
+use scrypto_unit::{TestRunner, TestRunnerBuilder};
 use std::{mem, path::Path};
 use transaction::{builder::ManifestBuilder, prelude::*};
 
@@ -35,7 +37,7 @@ pub enum TestAddress {
 }
 
 pub struct TestEnvironment {
-    pub test_runner: TestRunner,
+    pub test_runner: TestRunner<NoExtension, InMemorySubstateDatabase>,
     pub manifest_builder: ManifestBuilder,
 
     pub package_address: PackageAddress,
@@ -57,7 +59,7 @@ pub struct TestEnvironment {
 }
 
 pub fn compile_package<P: AsRef<Path>>(package_dir: P) -> (Vec<u8>, PackageDefinition) {
-    TestRunner::builder()
+    TestRunnerBuilder::new()
         .without_trace()
         .build()
         .compile(package_dir)
@@ -65,7 +67,7 @@ pub fn compile_package<P: AsRef<Path>>(package_dir: P) -> (Vec<u8>, PackageDefin
 
 impl TestEnvironment {
     pub fn new(package: &(Vec<u8>, PackageDefinition)) -> Self {
-        let mut test_runner = TestRunner::builder().without_trace().build();
+        let mut test_runner = TestRunnerBuilder::new().without_trace().build();
 
         let (public_key, _private_key, account) = test_runner.new_allocated_account();
         let package_address = test_runner.publish_package(
@@ -231,27 +233,29 @@ pub trait TransactionReceiptOutputBuckets {
 
 impl TransactionReceiptOutputBuckets for TransactionReceipt {
     fn output_buckets(&self, instruction_ids: Vec<usize>) -> Vec<Vec<ResourceSpecifier>> {
-        let worktop_changes = self
-            .expect_commit_success()
-            .execution_trace
-            .worktop_changes();
-        instruction_ids
-            .iter()
-            .filter_map(|id| {
-                let instruction_worktop_changes = worktop_changes.get(id).unwrap();
-                Some(
-                    instruction_worktop_changes
-                        .iter()
-                        .filter_map(|change| match change {
-                            WorktopChange::Put(resource_specifier) => {
-                                Some(resource_specifier.clone())
-                            }
-                            _ => None,
-                        })
-                        .collect(),
-                )
-            })
-            .collect()
+        match &self.expect_commit_success().execution_trace {
+            None => vec![],
+            Some(execution_trace) => {
+                let worktop_changes = execution_trace.worktop_changes();
+                instruction_ids
+                    .iter()
+                    .filter_map(|id| {
+                        let instruction_worktop_changes = worktop_changes.get(id).unwrap();
+                        Some(
+                            instruction_worktop_changes
+                                .iter()
+                                .filter_map(|change| match change {
+                                    WorktopChange::Put(resource_specifier) => {
+                                        Some(resource_specifier.clone())
+                                    }
+                                    _ => None,
+                                })
+                                .collect(),
+                        )
+                    })
+                    .collect()
+            }
+        }
     }
 
     fn outputs<T>(&self, instruction_ids: Vec<usize>) -> Vec<T>
