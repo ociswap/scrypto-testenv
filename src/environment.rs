@@ -6,7 +6,7 @@ use radix_engine::{
 };
 use radix_engine_stores::memory_db::InMemorySubstateDatabase;
 use scrypto::prelude::*;
-use scrypto_unit::{TestRunner, TestRunnerBuilder};
+use scrypto_unit::{TestRunner, TestRunnerBuilder, CustomGenesis};
 use std::{mem, path::Path};
 use transaction::{builder::ManifestBuilder, prelude::*};
 
@@ -60,6 +60,10 @@ pub struct TestEnvironment {
 
 pub fn compile_package<P: AsRef<Path>>(package_dir: P) -> (Vec<u8>, PackageDefinition) {
     TestRunnerBuilder::new()
+        .with_custom_genesis(CustomGenesis::default(
+            Epoch::of(1),
+            CustomGenesis::default_consensus_manager_config(),
+        ))
         .without_trace()
         .build()
         .compile(package_dir)
