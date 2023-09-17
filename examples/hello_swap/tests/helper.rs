@@ -13,7 +13,7 @@ lazy_static! {
 }
 
 impl TestHelperExecution for HelloSwapTestHelper {
-    fn environment(&mut self) -> &mut TestEnvironment {
+    fn env(&mut self) -> &mut TestEnvironment {
         &mut self.env
     }
 }
