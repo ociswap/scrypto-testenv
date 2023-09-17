@@ -40,7 +40,7 @@ pub struct TestEnvironment {
     pub test_runner: TestRunner<NoExtension, InMemorySubstateDatabase>,
     pub manifest_builder: ManifestBuilder,
 
-    pub package_address: PackageAddress,
+    pub package_addresses: HashMap<String, PackageAddress>,
     pub public_key: Secp256k1PublicKey,
     pub account: ComponentAddress,
 
@@ -70,16 +70,22 @@ pub fn compile_package<P: AsRef<Path>>(package_dir: P) -> (Vec<u8>, PackageDefin
 }
 
 impl TestEnvironment {
-    pub fn new(package: &(Vec<u8>, PackageDefinition)) -> Self {
+    pub fn new(packages: Vec<(&str, &(Vec<u8>, PackageDefinition))>) -> Self {
         let mut test_runner = TestRunnerBuilder::new().without_trace().build();
 
         let (public_key, _private_key, account) = test_runner.new_allocated_account();
-        let package_address = test_runner.publish_package(
-            package.0.clone(),
-            package.1.clone(),
-            BTreeMap::new(),
-            OwnerRole::None,
-        );
+        let package_addresses = packages
+            .iter()
+            .map(|(key, package)| (
+                key.to_string(),
+                test_runner.publish_package(
+                    package.0.clone(),
+                    package.1.clone(),
+                    BTreeMap::new(),
+                    OwnerRole::None
+                ),
+            ))
+            .collect();
         let manifest_builder = ManifestBuilder::new().lock_standard_test_fee(account);
 
         let admin_badge_address =
@@ -100,7 +106,7 @@ impl TestEnvironment {
         Self {
             test_runner,
             manifest_builder,
-            package_address,
+            package_addresses,
             public_key,
             account,
 
@@ -130,6 +136,12 @@ impl TestEnvironment {
             .or_default()
             .push(self.instruction_counter + label_instruction_id);
         self.instruction_counter += instruction_count;
+    }
+
+    pub fn package_address(&self, package_name: &str) -> PackageAddress {
+        *self.package_addresses
+            .get(package_name)
+            .expect(format!("Package {:?} not found", package_name).as_str())
     }
 }
 
