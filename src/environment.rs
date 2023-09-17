@@ -146,37 +146,37 @@ impl TestEnvironment {
 }
 
 pub trait TestHelperExecution {
-    fn environment(&mut self) -> &mut TestEnvironment;
+    fn env(&mut self) -> &mut TestEnvironment;
 
     fn execute(&mut self, verbose: bool) -> Receipt {
-        let account_component = self.environment().account;
-        let public_key = self.environment().public_key;
+        let account_component = self.env().account;
+        let public_key = self.env().public_key;
         let manifest_builder = mem::replace(
-            &mut self.environment().manifest_builder,
+            &mut self.env().manifest_builder,
             ManifestBuilder::new(),
         );
         let manifest = manifest_builder.deposit_batch(account_component).build();
-        let preview_receipt = self.environment().test_runner.preview_manifest(
+        let preview_receipt = self.env().test_runner.preview_manifest(
             manifest.clone(),
             vec![public_key.clone().into()],
             0,
             PreviewFlags::default(),
         );
-        let execution_receipt = self.environment().test_runner.execute_manifest(
+        let execution_receipt = self.env().test_runner.execute_manifest(
             manifest.clone(),
             vec![NonFungibleGlobalId::from_public_key(&public_key)],
         );
         if verbose {
             println!("{:?}", execution_receipt);
         }
-        let instruction_mapping = self.environment().instruction_ids_by_label.clone();
+        let instruction_mapping = self.env().instruction_ids_by_label.clone();
         self.reset_instructions();
         let manifest_builder = mem::replace(
-            &mut self.environment().manifest_builder,
+            &mut self.env().manifest_builder,
             ManifestBuilder::new(),
         );
-        self.environment().manifest_builder =
-            manifest_builder.lock_standard_test_fee(self.environment().account);
+        self.env().manifest_builder =
+            manifest_builder.lock_standard_test_fee(self.env().account);
         Receipt {
             execution_receipt,
             preview_receipt,
@@ -203,12 +203,12 @@ pub trait TestHelperExecution {
     }
 
     fn name(&mut self, name: &str) -> String {
-        format!("{}_{}", name, self.environment().instruction_counter)
+        format!("{}_{}", name, self.env().instruction_counter)
     }
 
     fn reset_instructions(&mut self) {
-        self.environment().instruction_ids_by_label = HashMap::new();
-        self.environment().instruction_counter = INSTRUCTION_COUNTER_INIT;
+        self.env().instruction_ids_by_label = HashMap::new();
+        self.env().instruction_counter = INSTRUCTION_COUNTER_INIT;
     }
 }
 
