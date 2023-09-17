@@ -26,10 +26,10 @@ pub struct HelloSwapTestHelper {
 
 impl HelloSwapTestHelper {
     pub fn new() -> HelloSwapTestHelper {
-        let environment = TestEnvironment::new(&PACKAGE);
+        let env = TestEnvironment::new(vec![("hello_swap", &PACKAGE)]);
 
         HelloSwapTestHelper {
-            env: environment,
+            env,
             pool_address: None,
             price: None,
         }
@@ -51,7 +51,7 @@ impl HelloSwapTestHelper {
             .with_name_lookup(|builder, lookup| {
                 let y_bucket = lookup.bucket(self.name("y_bucket"));
                 builder.call_function(
-                    self.env.package_address,
+                    self.env.package_address("hello_swap"),
                     "HelloSwap",
                     "instantiate",
                     manifest_args!(x_address, y_bucket, price),
