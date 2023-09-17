@@ -16,7 +16,7 @@ use crate::MAX_SUPPLY;
 macro_rules! nft_ids {
     ($($x:expr),*) => {
         {
-            let mut temp_set = BTreeSet::new();
+            let mut temp_set = IndexSet::new();
             $(
                 temp_set.insert(NonFungibleLocalId::Integer($x.into()));
             )*
@@ -313,7 +313,7 @@ pub fn sort_addresses(
 fn test_nft_ids() {
     assert_eq!(
         nft_ids!(1, 3, 2),
-        BTreeSet::from([
+        IndexSet::from([
             NonFungibleLocalId::Integer((1).into()),
             NonFungibleLocalId::Integer((2).into()),
             NonFungibleLocalId::Integer((3).into()),
