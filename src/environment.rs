@@ -285,6 +285,19 @@ impl TransactionReceiptOutputBuckets for TransactionReceipt {
     }
 }
 
+pub trait GetResourceAddress {
+    fn address(&self) -> ResourceAddress;
+}
+
+impl GetResourceAddress for ResourceSpecifier {
+    fn address(&self) -> ResourceAddress {
+        match self {
+            ResourceSpecifier::Amount(address, _) => *address,
+            ResourceSpecifier::Ids(address, _) => *address,
+        }
+    }
+}
+
 pub fn sort_addresses(
     a_address: ResourceAddress,
     b_address: ResourceAddress,
