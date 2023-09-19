@@ -6,7 +6,7 @@ use radix_engine::{
 };
 use radix_engine_stores::memory_db::InMemorySubstateDatabase;
 use scrypto::prelude::*;
-use scrypto_unit::{TestRunner, TestRunnerBuilder, CustomGenesis};
+use scrypto_unit::{CustomGenesis, TestRunner, TestRunnerBuilder};
 use std::{mem, path::Path};
 use transaction::{builder::ManifestBuilder, prelude::*};
 
@@ -71,20 +71,28 @@ pub fn compile_package<P: AsRef<Path>>(package_dir: P) -> (Vec<u8>, PackageDefin
 
 impl TestEnvironment {
     pub fn new(packages: Vec<(&str, &(Vec<u8>, PackageDefinition))>) -> Self {
-        let mut test_runner = TestRunnerBuilder::new().without_trace().build();
+        let mut test_runner = TestRunnerBuilder::new()
+            .with_custom_genesis(CustomGenesis::default(
+                Epoch::of(1),
+                CustomGenesis::default_consensus_manager_config(),
+            ))
+            .without_trace()
+            .build();
 
         let (public_key, _private_key, account) = test_runner.new_allocated_account();
         let package_addresses = packages
             .iter()
-            .map(|(key, package)| (
-                key.to_string(),
-                test_runner.publish_package(
-                    package.0.clone(),
-                    package.1.clone(),
-                    BTreeMap::new(),
-                    OwnerRole::None
-                ),
-            ))
+            .map(|(key, package)| {
+                (
+                    key.to_string(),
+                    test_runner.publish_package(
+                        package.0.clone(),
+                        package.1.clone(),
+                        BTreeMap::new(),
+                        OwnerRole::None,
+                    ),
+                )
+            })
             .collect();
         let manifest_builder = ManifestBuilder::new().lock_standard_test_fee(account);
 
@@ -139,7 +147,8 @@ impl TestEnvironment {
     }
 
     pub fn package_address(&self, package_name: &str) -> PackageAddress {
-        *self.package_addresses
+        *self
+            .package_addresses
             .get(package_name)
             .expect(format!("Package {:?} not found", package_name).as_str())
     }
@@ -151,10 +160,8 @@ pub trait TestHelperExecution {
     fn execute(&mut self, verbose: bool) -> Receipt {
         let account_component = self.env().account;
         let public_key = self.env().public_key;
-        let manifest_builder = mem::replace(
-            &mut self.env().manifest_builder,
-            ManifestBuilder::new(),
-        );
+        let manifest_builder =
+            mem::replace(&mut self.env().manifest_builder, ManifestBuilder::new());
         let manifest = manifest_builder.deposit_batch(account_component).build();
         let preview_receipt = self.env().test_runner.preview_manifest(
             manifest.clone(),
@@ -171,12 +178,9 @@ pub trait TestHelperExecution {
         }
         let instruction_mapping = self.env().instruction_ids_by_label.clone();
         self.reset_instructions();
-        let manifest_builder = mem::replace(
-            &mut self.env().manifest_builder,
-            ManifestBuilder::new(),
-        );
-        self.env().manifest_builder =
-            manifest_builder.lock_standard_test_fee(self.env().account);
+        let manifest_builder =
+            mem::replace(&mut self.env().manifest_builder, ManifestBuilder::new());
+        self.env().manifest_builder = manifest_builder.lock_standard_test_fee(self.env().account);
         Receipt {
             execution_receipt,
             preview_receipt,
