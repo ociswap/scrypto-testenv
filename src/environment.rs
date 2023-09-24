@@ -86,8 +86,7 @@ impl TestEnvironment {
                 (
                     key.to_string(),
                     test_runner.publish_package(
-                        package.0.clone(),
-                        package.1.clone(),
+                        (package.0.clone(), package.1.clone()),
                         BTreeMap::new(),
                         OwnerRole::None,
                     ),

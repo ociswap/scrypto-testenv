@@ -1,17 +1,17 @@
 [package]
 name = "scrypto_testenv"
-version = "0.4.4"
+version = "0.5.0"
 edition = "2021"
 license = "MIT"
 description = "Test environment helper for Radix Scrypto making it easier to write automatic tests"
 repository = "https://github.com/ociswap/scrypto-testenv"
 
 [dependencies]
-scrypto = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v0.12.1" }
-transaction = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v0.12.1" }
-radix-engine = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v0.12.1" }
-radix-engine-stores = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v0.12.1" }
-scrypto-unit = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v0.12.1" }
+scrypto = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.0.0" }
+transaction = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.0.0" }
+radix-engine = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.0.0" }
+radix-engine-stores = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.0.0" }
+scrypto-unit = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.0.0" }
 
 [lib]
 crate-type = ["cdylib", "lib"]
