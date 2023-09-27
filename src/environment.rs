@@ -43,6 +43,7 @@ pub struct TestEnvironment {
     pub package_addresses: HashMap<String, PackageAddress>,
     pub public_key: Secp256k1PublicKey,
     pub account: ComponentAddress,
+    pub dapp_definition: ComponentAddress,
 
     pub admin_badge_address: ResourceAddress,
     pub a_address: ResourceAddress,
@@ -80,6 +81,7 @@ impl TestEnvironment {
             .build();
 
         let (public_key, _private_key, account) = test_runner.new_allocated_account();
+        let (_, _, dapp_definition) = test_runner.new_allocated_account();
         let package_addresses = packages
             .iter()
             .map(|(key, package)| {
@@ -116,6 +118,7 @@ impl TestEnvironment {
             package_addresses,
             public_key,
             account,
+            dapp_definition,
 
             admin_badge_address,
             a_address,

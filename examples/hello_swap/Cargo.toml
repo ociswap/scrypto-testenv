@@ -11,8 +11,8 @@ scrypto = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.0.0"
 transaction = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.0.0" }
 radix-engine = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.0.0" }
 scrypto-unit = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.0.0" }
-# scrypto_testenv = { git = "https://github.com/ociswap/scrypto-testenv", branch = "main", version = "0.5.0" }
-scrypto_testenv = { path = "../..", version = "0.5.0" }
+# scrypto_testenv = { git = "https://github.com/ociswap/scrypto-testenv", branch = "main", version = "0.5.1" }
+scrypto_testenv = { path = "../..", version = "0.5.1" }
 lazy_static = "1.4.0"
 
 [profile.release]
