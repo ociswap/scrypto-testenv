@@ -99,10 +99,28 @@ impl TestEnvironment {
 
         let admin_badge_address =
             test_runner.create_fungible_resource(dec!(1), DIVISIBILITY_NONE, account);
-        let a_address =
-            test_runner.create_fungible_resource(MAX_SUPPLY, DIVISIBILITY_MAXIMUM, account);
-        let b_address =
-            test_runner.create_fungible_resource(MAX_SUPPLY, DIVISIBILITY_MAXIMUM, account);
+        let a_address = test_runner.create_fungible_resource_advanced(
+            MAX_SUPPLY,
+            DIVISIBILITY_MAXIMUM,
+            account,
+            metadata! {
+                init {
+                    "name" => "Test token A".to_owned(), locked;
+                    "symbol" => "A".to_owned(), locked;
+                }
+            },
+        );
+        let b_address = test_runner.create_fungible_resource_advanced(
+            MAX_SUPPLY,
+            DIVISIBILITY_MAXIMUM,
+            account,
+            metadata! {
+                init {
+                    "name" => "Test token B".to_owned(), locked;
+                    "symbol" => "B".to_owned(), locked;
+                }
+            },
+        );
         let (x_address, y_address) = sort_addresses(a_address, b_address);
 
         let u_address =
@@ -312,6 +330,41 @@ pub fn sort_addresses(
         (a_address, b_address)
     } else {
         (b_address, a_address)
+    }
+}
+
+pub trait CreateFungibleResourceAdvanced {
+    fn create_fungible_resource_advanced(
+        &mut self,
+        amount: Decimal,
+        divisibility: u8,
+        account: ComponentAddress,
+        metadata: ModuleConfig<MetadataInit>,
+    ) -> ResourceAddress;
+}
+
+impl CreateFungibleResourceAdvanced for TestRunner<NoExtension, InMemorySubstateDatabase> {
+    fn create_fungible_resource_advanced(
+        &mut self,
+        amount: Decimal,
+        divisibility: u8,
+        account: ComponentAddress,
+        metadata: ModuleConfig<MetadataInit>,
+    ) -> ResourceAddress {
+        let manifest = ManifestBuilder::new()
+            .lock_fee_from_faucet()
+            .create_fungible_resource(
+                OwnerRole::None,
+                true,
+                divisibility,
+                FungibleResourceRoles::default(),
+                metadata,
+                Some(amount),
+            )
+            .try_deposit_entire_worktop_or_abort(account, None)
+            .build();
+        let receipt = self.execute_manifest(manifest, vec![]);
+        receipt.expect_commit(true).new_resource_addresses()[0]
     }
 }
 
