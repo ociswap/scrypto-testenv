@@ -13,6 +13,13 @@ use transaction::{builder::ManifestBuilder, prelude::*};
 use crate::MAX_SUPPLY;
 
 #[macro_export]
+macro_rules! nft_id {
+    ($x:expr) => {
+        NonFungibleLocalId::Integer($x.into())
+    };
+}
+
+#[macro_export]
 macro_rules! nft_ids {
     ($($x:expr),*) => {
         {
@@ -366,6 +373,11 @@ impl CreateFungibleResourceAdvanced for TestRunner<NoExtension, InMemorySubstate
         let receipt = self.execute_manifest(manifest, vec![]);
         receipt.expect_commit(true).new_resource_addresses()[0]
     }
+}
+
+#[test]
+fn test_nft_id() {
+    assert_eq!(nft_id!(3), NonFungibleLocalId::Integer((3).into()))
 }
 
 #[test]
