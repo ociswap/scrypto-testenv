@@ -32,7 +32,7 @@ macro_rules! nft_ids {
     };
 }
 
-const INSTRUCTION_COUNTER_INIT: usize = 1; // lock_fee_from_faucet will be added always as first instruction automatically
+const INSTRUCTION_COUNTER_INIT: usize = 1; // lock fee will be added always as first instruction automatically
 
 pub enum TestAddress {
     A,
@@ -102,7 +102,7 @@ impl TestEnvironment {
                 )
             })
             .collect();
-        let manifest_builder = ManifestBuilder::new().lock_fee_from_faucet();
+        let manifest_builder = ManifestBuilder::new().lock_fee(FAUCET, 100000);
 
         let admin_badge_address =
             test_runner.create_fungible_resource(dec!(1), DIVISIBILITY_NONE, account);
@@ -207,7 +207,7 @@ pub trait TestHelperExecution {
         self.reset_instructions();
         let manifest_builder =
             mem::replace(&mut self.env().manifest_builder, ManifestBuilder::new());
-        self.env().manifest_builder = manifest_builder.lock_fee_from_faucet();
+        self.env().manifest_builder = manifest_builder.lock_fee(FAUCET, 100000);
         Receipt {
             execution_receipt,
             preview_receipt,
