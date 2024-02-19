@@ -12,6 +12,7 @@ transaction = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.
 radix-engine = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.1.1" }
 radix-engine-stores = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.1.1" }
 scrypto-unit = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.1.1" }
+lazy_static = "1.4.0"
 
 [lib]
 crate-type = ["cdylib", "lib"]
