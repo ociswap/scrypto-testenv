@@ -374,9 +374,15 @@ impl TestEnvironmentSnapshot {
     /// - instruction_ids_by_label
     pub fn revive(&self) -> TestEnvironment {
         TestEnvironment {
-            test_runner: TestRunnerBuilder::new().build_from_snapshot(
-                self.test_runner_snapshot.clone()
-            ),
+            test_runner: TestRunnerBuilder::new()
+                .with_custom_genesis(
+                    CustomGenesis::default(
+                        Epoch::of(1),
+                        CustomGenesis::default_consensus_manager_config()
+                    )
+                )
+                .without_trace()
+                .build_from_snapshot(self.test_runner_snapshot.clone()), //TODO optimize so clone is not needed?
             manifest_builder: ManifestBuilder::new(),
 
             package_addresses: self.package_addresses.clone(),
