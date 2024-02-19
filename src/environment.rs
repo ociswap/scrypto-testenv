@@ -312,6 +312,11 @@ impl TestEnvironment {
     }
 }
 
+/// NOTE: This should only be used for single clones,
+/// since it clones by taking a snapshot and then recovering from it.
+/// For the creation of many clones, it is advised to manually snapshot
+/// and then creating as many TestEnvironments as needed from
+/// that snapshot
 impl Clone for TestEnvironment {
     fn clone(&self) -> Self {
         self.create_snapshot().revive()
