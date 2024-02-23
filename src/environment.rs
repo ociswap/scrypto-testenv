@@ -383,7 +383,7 @@ impl TestEnvironmentSnapshot {
                 )
                 .without_trace()
                 .build_from_snapshot(self.test_runner_snapshot.clone()), //TODO optimize so clone is not needed?
-            manifest_builder: ManifestBuilder::new(),
+            manifest_builder: ManifestBuilder::new().lock_standard_test_fee(self.account),
 
             package_addresses: self.package_addresses.clone(),
             public_key: self.public_key.clone(),
