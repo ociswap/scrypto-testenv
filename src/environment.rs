@@ -7,9 +7,9 @@ use radix_engine::{
 use radix_engine_stores::memory_db::InMemorySubstateDatabase;
 use scrypto::prelude::*;
 use scrypto_unit::{ CustomGenesis, TestRunner, TestRunnerBuilder, TestRunnerSnapshot };
+use std::hash::Hash;
 use std::{ mem, path::{ Path, PathBuf } };
 use transaction::{ builder::ManifestBuilder, prelude::* };
-use std::hash::Hash;
 
 use crate::MAX_SUPPLY;
 
@@ -42,8 +42,10 @@ use std::sync::RwLock;
 type CompiledPackage = (Vec<u8>, PackageDefinition);
 
 lazy_static! {
-    static ref TEST_ENVIRONMENT_CACHE: RwLock<HashMap<BTreeSet<PathBuf>, TestEnvironmentSnapshot>> = RwLock::new(HashMap::new());
-    static ref PACKAGE_CACHE: RwLock<HashMap<PathBuf, CompiledPackage>> = RwLock::new(HashMap::new());
+    static ref TEST_ENVIRONMENT_CACHE: RwLock<HashMap<BTreeSet<PathBuf>, TestEnvironmentSnapshot>> =
+        RwLock::new(HashMap::new());
+    static ref PACKAGE_CACHE: RwLock<HashMap<PathBuf, CompiledPackage>> =
+        RwLock::new(HashMap::new());
 }
 
 fn get_cache<K: Hash + Eq, V: Clone>(cache: &RwLock<HashMap<K, V>>, key: &K) -> Option<V> {
@@ -193,22 +195,22 @@ impl TestEnvironment {
             DIVISIBILITY_MAXIMUM,
             account,
             metadata! {
-        init {
-            "name" => "Test token A".to_owned(), locked;
-            "symbol" => "A".to_owned(), locked;
-        }
-    }
+                init {
+                    "name" => "Test token A".to_owned(), locked;
+                    "symbol" => "A".to_owned(), locked;
+                }
+            }
         );
         let b_address = test_runner.create_fungible_resource_advanced(
             MAX_SUPPLY,
             DIVISIBILITY_MAXIMUM,
             account,
             metadata! {
-        init {
-            "name" => "Test token B".to_owned(), locked;
-            "symbol" => "B".to_owned(), locked;
-        }
-    }
+                init {
+                    "name" => "Test token B".to_owned(), locked;
+                    "symbol" => "B".to_owned(), locked;
+                }
+            }
         );
         let (x_address, y_address) = sort_addresses(a_address, b_address);
 
@@ -257,8 +259,6 @@ impl TestEnvironment {
     /// since the first results in caching of clean environment states + respective packages,
     /// speeding up future calls
     pub fn compile_and_publish_packages(&mut self, packages: HashMap<&str, PathBuf>) {
-        // Todo this should publish in a constant order. Use BTreeSet?
-
         let package_addresses: HashMap<String, PackageAddress> = packages
             .into_iter()
             .map(|(package_name, package_dir)| {
@@ -382,7 +382,7 @@ impl TestEnvironmentSnapshot {
                     )
                 )
                 .without_trace()
-                .build_from_snapshot(self.test_runner_snapshot.clone()), //TODO optimize so clone is not needed?
+                .build_from_snapshot(self.test_runner_snapshot.clone()),
             manifest_builder: ManifestBuilder::new().lock_standard_test_fee(self.account),
 
             package_addresses: self.package_addresses.clone(),
