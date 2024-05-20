@@ -1,6 +1,6 @@
 [package]
 name = "scrypto_testenv"
-version = "0.6.2"
+version = "0.6.3"
 edition = "2021"
 license = "MIT"
 description = "Test environment helper for Radix Scrypto making it easier to write automatic tests"
