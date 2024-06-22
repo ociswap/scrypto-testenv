@@ -1,15 +1,20 @@
 use radix_engine::{
     blueprints::package::PackageDefinition,
-    system::system_modules::execution_trace::{ ResourceSpecifier, WorktopChange },
+    system::system_modules::execution_trace::{ResourceSpecifier, WorktopChange},
     transaction::TransactionReceipt,
     vm::NoExtension,
 };
-use radix_engine_stores::memory_db::InMemorySubstateDatabase;
+use radix_substate_store_impls::memory_db::InMemorySubstateDatabase;
+use radix_transactions::{builder::ManifestBuilder, prelude::*};
 use scrypto::prelude::*;
-use scrypto_unit::{ CustomGenesis, TestRunner, TestRunnerBuilder, TestRunnerSnapshot };
+use scrypto_test::ledger_simulator::{
+    CustomGenesis, LedgerSimulator, LedgerSimulatorBuilder, LedgerSimulatorSnapshot,
+};
 use std::hash::Hash;
-use std::{ mem, path::{ Path, PathBuf } };
-use transaction::{ builder::ManifestBuilder, prelude::* };
+use std::{
+    mem,
+    path::{Path, PathBuf},
+};
 
 use crate::MAX_SUPPLY;
 
@@ -90,7 +95,7 @@ pub enum TestAddress {
 }
 
 pub struct TestEnvironment {
-    pub test_runner: TestRunner<NoExtension, InMemorySubstateDatabase>,
+    pub test_runner: LedgerSimulator<NoExtension, InMemorySubstateDatabase>,
     pub manifest_builder: ManifestBuilder,
 
     pub package_addresses: HashMap<String, PackageAddress>,
@@ -127,17 +132,16 @@ impl TestEnvironment {
             return test_environment_;
         }
 
-        let mut test_environment_new = get_cache_test_environment(&BTreeSet::new()).unwrap_or_else(
-            || {
+        let mut test_environment_new =
+            get_cache_test_environment(&BTreeSet::new()).unwrap_or_else(|| {
                 let test_environment_empty_ = TestEnvironment::generate_new_test_environment();
                 write_cache(
                     &TEST_ENVIRONMENT_CACHE,
                     BTreeSet::new(), // Cache empty (packageless) environment
-                    test_environment_empty_.create_snapshot()
+                    test_environment_empty_.create_snapshot(),
                 );
                 test_environment_empty_
-            }
-        );
+            });
 
         if packages.is_empty() {
             return test_environment_new;
@@ -153,7 +157,7 @@ impl TestEnvironment {
         write_cache(
             &TEST_ENVIRONMENT_CACHE,
             package_dirs, // Cache TestEnvironment with new packages
-            test_environment_new.create_snapshot()
+            test_environment_new.create_snapshot(),
         );
         test_environment_new
     }
@@ -168,14 +172,12 @@ impl TestEnvironment {
     }
 
     fn generate_new_test_environment() -> TestEnvironment {
-        let mut test_runner = TestRunnerBuilder::new()
-            .with_custom_genesis(
-                CustomGenesis::default(
-                    Epoch::of(1),
-                    CustomGenesis::default_consensus_manager_config()
-                )
-            )
-            .without_trace()
+        let mut test_runner = LedgerSimulatorBuilder::new()
+            .with_custom_genesis(CustomGenesis::default(
+                Epoch::of(1),
+                CustomGenesis::default_consensus_manager_config(),
+            ))
+            .without_kernel_trace()
             .build();
 
         let (public_key, _private_key, account) = test_runner.new_allocated_account();
@@ -185,11 +187,8 @@ impl TestEnvironment {
 
         let package_addresses: HashMap<String, PackageAddress> = HashMap::new();
 
-        let admin_badge_address = test_runner.create_fungible_resource(
-            dec!(1),
-            DIVISIBILITY_NONE,
-            account
-        );
+        let admin_badge_address =
+            test_runner.create_fungible_resource(dec!(1), DIVISIBILITY_NONE, account);
         let a_address = test_runner.create_fungible_resource_advanced(
             MAX_SUPPLY,
             DIVISIBILITY_MAXIMUM,
@@ -199,7 +198,7 @@ impl TestEnvironment {
                     "name" => "Test token A".to_owned(), locked;
                     "symbol" => "A".to_owned(), locked;
                 }
-            }
+            },
         );
         let b_address = test_runner.create_fungible_resource_advanced(
             MAX_SUPPLY,
@@ -210,20 +209,14 @@ impl TestEnvironment {
                     "name" => "Test token B".to_owned(), locked;
                     "symbol" => "B".to_owned(), locked;
                 }
-            }
+            },
         );
         let (x_address, y_address) = sort_addresses(a_address, b_address);
 
-        let u_address = test_runner.create_fungible_resource(
-            dec!(1000000000),
-            DIVISIBILITY_MAXIMUM,
-            account
-        );
-        let v_address = test_runner.create_fungible_resource(
-            dec!(10000000),
-            DIVISIBILITY_MAXIMUM,
-            account
-        );
+        let u_address =
+            test_runner.create_fungible_resource(dec!(1000000000), DIVISIBILITY_MAXIMUM, account);
+        let v_address =
+            test_runner.create_fungible_resource(dec!(10000000), DIVISIBILITY_MAXIMUM, account);
         let j_nft_address = test_runner.create_non_fungible_resource(account);
         let k_nft_address = test_runner.create_non_fungible_resource(account);
 
@@ -274,7 +267,7 @@ impl TestEnvironment {
                 let package_address = self.test_runner.publish_package(
                     compiled_package,
                     BTreeMap::new(),
-                    OwnerRole::None
+                    OwnerRole::None,
                 );
                 (package_name.to_string(), package_address)
             })
@@ -287,7 +280,7 @@ impl TestEnvironment {
         &mut self,
         label: &str,
         instruction_count: usize,
-        label_instruction_id: usize
+        label_instruction_id: usize,
     ) {
         self.instruction_ids_by_label
             .entry(label.to_string())
@@ -297,7 +290,8 @@ impl TestEnvironment {
     }
 
     pub fn package_address(&self, package_name: &str) -> PackageAddress {
-        *self.package_addresses
+        *self
+            .package_addresses
             .get(package_name)
             .expect(format!("Package {:?} not found", package_name).as_str())
     }
@@ -324,7 +318,7 @@ impl Clone for TestEnvironment {
 }
 
 pub struct TestEnvironmentSnapshot {
-    pub test_runner_snapshot: TestRunnerSnapshot,
+    pub test_runner_snapshot: LedgerSimulatorSnapshot,
 
     pub package_addresses: HashMap<String, PackageAddress>,
     pub public_key: Secp256k1PublicKey,
@@ -374,14 +368,12 @@ impl TestEnvironmentSnapshot {
     /// - instruction_ids_by_label
     pub fn revive(&self) -> TestEnvironment {
         TestEnvironment {
-            test_runner: TestRunnerBuilder::new()
-                .with_custom_genesis(
-                    CustomGenesis::default(
-                        Epoch::of(1),
-                        CustomGenesis::default_consensus_manager_config()
-                    )
-                )
-                .without_trace()
+            test_runner: LedgerSimulatorBuilder::new()
+                .with_custom_genesis(CustomGenesis::default(
+                    Epoch::of(1),
+                    CustomGenesis::default_consensus_manager_config(),
+                ))
+                .without_kernel_trace()
                 .build_from_snapshot(self.test_runner_snapshot.clone()),
             manifest_builder: ManifestBuilder::new().lock_standard_test_fee(self.account),
 
@@ -412,34 +404,26 @@ pub trait TestHelperExecution {
     fn execute(&mut self, verbose: bool) -> Receipt {
         let account_component = self.env().account;
         let public_key = self.env().public_key;
-        let manifest_builder = mem::replace(
-            &mut self.env().manifest_builder,
-            ManifestBuilder::new()
-        );
+        let manifest_builder =
+            mem::replace(&mut self.env().manifest_builder, ManifestBuilder::new());
         let manifest = manifest_builder.deposit_batch(account_component).build();
-        let preview_receipt = self
-            .env()
-            .test_runner.preview_manifest(
-                manifest.clone(),
-                vec![public_key.clone().into()],
-                0,
-                PreviewFlags::default()
-            );
-        let execution_receipt = self
-            .env()
-            .test_runner.execute_manifest(
-                manifest.clone(),
-                vec![NonFungibleGlobalId::from_public_key(&public_key)]
-            );
+        let preview_receipt = self.env().test_runner.preview_manifest(
+            manifest.clone(),
+            vec![public_key.clone().into()],
+            0,
+            PreviewFlags::default(),
+        );
+        let execution_receipt = self.env().test_runner.execute_manifest(
+            manifest.clone(),
+            vec![NonFungibleGlobalId::from_public_key(&public_key)],
+        );
         if verbose {
             println!("{:?}", execution_receipt);
         }
         let instruction_mapping = self.env().instruction_ids_by_label.clone();
         self.reset_instructions();
-        let manifest_builder = mem::replace(
-            &mut self.env().manifest_builder,
-            ManifestBuilder::new()
-        );
+        let manifest_builder =
+            mem::replace(&mut self.env().manifest_builder, ManifestBuilder::new());
         self.env().manifest_builder = manifest_builder.lock_standard_test_fee(self.env().account);
         Receipt {
             execution_receipt,
@@ -484,21 +468,31 @@ pub struct Receipt {
 
 impl Receipt {
     pub fn output_buckets(&self, instruction_label: &str) -> Vec<Vec<ResourceSpecifier>> {
-        self.preview_receipt.output_buckets(self.instruction_ids(instruction_label))
+        self.preview_receipt
+            .output_buckets(self.instruction_ids(instruction_label))
     }
 
-    pub fn outputs<T>(&self, instruction_label: &str) -> Vec<T> where T: ScryptoDecode {
-        self.execution_receipt.outputs(self.instruction_ids(instruction_label))
+    pub fn outputs<T>(&self, instruction_label: &str) -> Vec<T>
+    where
+        T: ScryptoDecode,
+    {
+        self.execution_receipt
+            .outputs(self.instruction_ids(instruction_label))
     }
 
     fn instruction_ids(&self, instruction_label: &str) -> Vec<usize> {
-        self.instruction_ids_by_label.get(&instruction_label.to_string()).unwrap().clone()
+        self.instruction_ids_by_label
+            .get(&instruction_label.to_string())
+            .unwrap()
+            .clone()
     }
 }
 
 pub trait TransactionReceiptOutputBuckets {
     fn output_buckets(&self, instruction_ids: Vec<usize>) -> Vec<Vec<ResourceSpecifier>>;
-    fn outputs<T>(&self, instruction_ids: Vec<usize>) -> Vec<T> where T: ScryptoDecode;
+    fn outputs<T>(&self, instruction_ids: Vec<usize>) -> Vec<T>
+    where
+        T: ScryptoDecode;
 }
 
 impl TransactionReceiptOutputBuckets for TransactionReceipt {
@@ -514,15 +508,13 @@ impl TransactionReceiptOutputBuckets for TransactionReceipt {
                         Some(
                             instruction_worktop_changes
                                 .iter()
-                                .filter_map(|change| {
-                                    match change {
-                                        WorktopChange::Put(resource_specifier) => {
-                                            Some(resource_specifier.clone())
-                                        }
-                                        _ => None,
+                                .filter_map(|change| match change {
+                                    WorktopChange::Put(resource_specifier) => {
+                                        Some(resource_specifier.clone())
                                     }
+                                    _ => None,
                                 })
-                                .collect()
+                                .collect(),
                         )
                     })
                     .collect()
@@ -530,7 +522,10 @@ impl TransactionReceiptOutputBuckets for TransactionReceipt {
         }
     }
 
-    fn outputs<T>(&self, instruction_ids: Vec<usize>) -> Vec<T> where T: ScryptoDecode {
+    fn outputs<T>(&self, instruction_ids: Vec<usize>) -> Vec<T>
+    where
+        T: ScryptoDecode,
+    {
         instruction_ids
             .iter()
             .filter_map(|id| Some(self.expect_commit_success().output(*id)))
@@ -553,9 +548,13 @@ impl GetResourceAddress for ResourceSpecifier {
 
 pub fn sort_addresses(
     a_address: ResourceAddress,
-    b_address: ResourceAddress
+    b_address: ResourceAddress,
 ) -> (ResourceAddress, ResourceAddress) {
-    if a_address < b_address { (a_address, b_address) } else { (b_address, a_address) }
+    if a_address < b_address {
+        (a_address, b_address)
+    } else {
+        (b_address, a_address)
+    }
 }
 
 pub trait CreateFungibleResourceAdvanced {
@@ -564,17 +563,17 @@ pub trait CreateFungibleResourceAdvanced {
         amount: Decimal,
         divisibility: u8,
         account: ComponentAddress,
-        metadata: ModuleConfig<MetadataInit>
+        metadata: ModuleConfig<MetadataInit>,
     ) -> ResourceAddress;
 }
 
-impl CreateFungibleResourceAdvanced for TestRunner<NoExtension, InMemorySubstateDatabase> {
+impl CreateFungibleResourceAdvanced for LedgerSimulator<NoExtension, InMemorySubstateDatabase> {
     fn create_fungible_resource_advanced(
         &mut self,
         amount: Decimal,
         divisibility: u8,
         account: ComponentAddress,
-        metadata: ModuleConfig<MetadataInit>
+        metadata: ModuleConfig<MetadataInit>,
     ) -> ResourceAddress {
         let manifest = ManifestBuilder::new()
             .lock_fee_from_faucet()
@@ -584,7 +583,7 @@ impl CreateFungibleResourceAdvanced for TestRunner<NoExtension, InMemorySubstate
                 divisibility,
                 FungibleResourceRoles::default(),
                 metadata,
-                Some(amount)
+                Some(amount),
             )
             .try_deposit_entire_worktop_or_abort(account, None)
             .build();
