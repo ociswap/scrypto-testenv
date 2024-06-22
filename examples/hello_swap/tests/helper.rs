@@ -1,16 +1,8 @@
-use lazy_static::lazy_static;
-use radix_engine::{
-    blueprints::package::PackageDefinition,
-    system::system_modules::execution_trace::ResourceSpecifier::Amount,
-};
+use radix_engine::system::system_modules::execution_trace::ResourceSpecifier::Amount;
+use radix_transactions::builder::ManifestBuilder;
 use scrypto::prelude::*;
 use scrypto_testenv::*;
 use std::mem;
-use transaction::builder::ManifestBuilder;
-
-lazy_static! {
-    static ref PACKAGE: (Vec<u8>, PackageDefinition) = compile_package(this_package!());
-}
 
 impl TestHelperExecution for HelloSwapTestHelper {
     fn env(&mut self) -> &mut TestEnvironment {
@@ -26,7 +18,9 @@ pub struct HelloSwapTestHelper {
 
 impl HelloSwapTestHelper {
     pub fn new() -> HelloSwapTestHelper {
-        let env = TestEnvironment::new(vec![("hello_swap", &PACKAGE)]);
+        let packages: HashMap<&str, &str> = vec![("hello_swap", ".")].into_iter().collect();
+
+        let env = TestEnvironment::new(packages);
 
         HelloSwapTestHelper {
             env,

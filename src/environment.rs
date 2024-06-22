@@ -4,11 +4,17 @@ use radix_engine::{
     transaction::TransactionReceipt,
     vm::NoExtension,
 };
-use radix_engine_stores::memory_db::InMemorySubstateDatabase;
+use radix_substate_store_impls::memory_db::InMemorySubstateDatabase;
+use radix_transactions::{builder::ManifestBuilder, prelude::*};
 use scrypto::prelude::*;
-use scrypto_unit::{CustomGenesis, TestRunner, TestRunnerBuilder};
-use std::{mem, path::Path};
-use transaction::{builder::ManifestBuilder, prelude::*};
+use scrypto_test::ledger_simulator::{
+    CustomGenesis, LedgerSimulator, LedgerSimulatorBuilder, LedgerSimulatorSnapshot,
+};
+use std::hash::Hash;
+use std::{
+    mem,
+    path::{Path, PathBuf},
+};
 
 use crate::MAX_SUPPLY;
 
@@ -34,6 +40,51 @@ macro_rules! nft_ids {
 
 const INSTRUCTION_COUNTER_INIT: usize = 1; // lock_standard_test_fee will be added always as first instruction automatically
 
+use lazy_static::lazy_static;
+use std::collections::HashMap;
+use std::sync::RwLock;
+
+type CompiledPackage = (Vec<u8>, PackageDefinition);
+
+lazy_static! {
+    static ref TEST_ENVIRONMENT_CACHE: RwLock<HashMap<BTreeSet<PathBuf>, TestEnvironmentSnapshot>> =
+        RwLock::new(HashMap::new());
+    static ref PACKAGE_CACHE: RwLock<HashMap<PathBuf, CompiledPackage>> =
+        RwLock::new(HashMap::new());
+}
+
+fn get_cache<K: Hash + Eq, V: Clone>(cache: &RwLock<HashMap<K, V>>, key: &K) -> Option<V> {
+    let read_lock = cache.read().unwrap();
+    match read_lock.get(key) {
+        Some(state) => Some(state.clone()),
+        None => None,
+    }
+}
+
+// Optimized getter for TEST_ENVIRONMENT_CACHE, avoids unnecessary clone with direct revive
+fn get_cache_test_environment(key: &BTreeSet<PathBuf>) -> Option<TestEnvironment> {
+    let read_lock = TEST_ENVIRONMENT_CACHE.read().unwrap();
+    match read_lock.get(key) {
+        Some(snapshot) => Some(snapshot.revive()),
+        None => None,
+    }
+}
+
+fn write_cache<K: Hash + Eq + Clone, V>(cache: &RwLock<HashMap<K, V>>, key: K, value: V) {
+    let mut write_lock = cache.write().unwrap();
+    write_lock.entry(key).or_insert(value);
+}
+
+// OPTIMIZE: can be optimized in the future by checking whether a test_environment is being generated,
+// even if it was found not to exist, avoiding concurrent generation of the same environment,
+// and then discarding one of the copies after the first one is written.
+// Two possible approaches:
+// 1) Creating two static RwLock Hashmap variables, one for PACKAGE_CACHE and the other for TEST_ENVIRONMENT_CACHE
+//    That would state, for each possible cache entry, whether it is being generated or not
+// 2) Instead of the cache variables holding the final object, they would be wrapped in a
+//    new CachedObject struct, that has as fields and Option<T> and a bool "generation"
+//    that would be set to true when a thread starts to generate that object
+
 pub enum TestAddress {
     A,
     B,
@@ -44,7 +95,7 @@ pub enum TestAddress {
 }
 
 pub struct TestEnvironment {
-    pub test_runner: TestRunner<NoExtension, InMemorySubstateDatabase>,
+    pub test_runner: LedgerSimulator<NoExtension, InMemorySubstateDatabase>,
     pub manifest_builder: ManifestBuilder,
 
     pub package_addresses: HashMap<String, PackageAddress>,
@@ -66,43 +117,75 @@ pub struct TestEnvironment {
     instruction_ids_by_label: HashMap<String, Vec<usize>>,
 }
 
-pub fn compile_package<P: AsRef<Path>>(package_dir: P) -> (Vec<u8>, PackageDefinition) {
-    TestRunnerBuilder::new()
-        .with_custom_genesis(CustomGenesis::default(
-            Epoch::of(1),
-            CustomGenesis::default_consensus_manager_config(),
-        ))
-        .without_trace()
-        .build()
-        .compile(package_dir)
-}
-
 impl TestEnvironment {
-    pub fn new(packages: Vec<(&str, &(Vec<u8>, PackageDefinition))>) -> Self {
-        let mut test_runner = TestRunnerBuilder::new()
+    pub fn new<T: AsRef<Path> + Ord>(packages: HashMap<&str, T>) -> Self {
+        let packages: HashMap<&str, PathBuf> = packages
+            .iter()
+            .map(|(&package_name, package_dir)| (package_name, package_dir.as_ref().to_path_buf()))
+            .into_iter()
+            .collect();
+
+        let package_dirs: BTreeSet<PathBuf> = packages.values().cloned().collect();
+        let test_environment_cached = get_cache_test_environment(&package_dirs);
+
+        if let Some(test_environment_) = test_environment_cached {
+            return test_environment_;
+        }
+
+        let mut test_environment_new =
+            get_cache_test_environment(&BTreeSet::new()).unwrap_or_else(|| {
+                let test_environment_empty_ = TestEnvironment::generate_new_test_environment();
+                write_cache(
+                    &TEST_ENVIRONMENT_CACHE,
+                    BTreeSet::new(), // Cache empty (packageless) environment
+                    test_environment_empty_.create_snapshot(),
+                );
+                test_environment_empty_
+            });
+
+        if packages.is_empty() {
+            return test_environment_new;
+        }
+
+        // Leaving package publishing for last, means that there will be nothing
+        // changing the network state before the account/tokens/etc are created
+        // This means we can use a snapshot of the an empty (package-less) TestEnvironment
+        // and just publish packages on top of it, with the fields of the TestEnvironment
+        // (account/tokens/etc) remaining valid
+
+        test_environment_new.compile_and_publish_packages(packages);
+        write_cache(
+            &TEST_ENVIRONMENT_CACHE,
+            package_dirs, // Cache TestEnvironment with new packages
+            test_environment_new.create_snapshot(),
+        );
+        test_environment_new
+    }
+
+    /// Retrieves a TestEnvironment from the snapshot
+    /// IMPORTANT: The states of the following fields are not recovered:
+    /// - MenifestBuilder
+    /// - instruction_counter
+    /// - instruction_ids_by_label
+    pub fn from_snapshot(snapshot: TestEnvironmentSnapshot) -> Self {
+        snapshot.revive()
+    }
+
+    fn generate_new_test_environment() -> TestEnvironment {
+        let mut test_runner = LedgerSimulatorBuilder::new()
             .with_custom_genesis(CustomGenesis::default(
                 Epoch::of(1),
                 CustomGenesis::default_consensus_manager_config(),
             ))
-            .without_trace()
+            .without_kernel_trace()
             .build();
 
         let (public_key, _private_key, account) = test_runner.new_allocated_account();
         let (_, _, dapp_definition) = test_runner.new_allocated_account();
-        let package_addresses = packages
-            .iter()
-            .map(|(key, package)| {
-                (
-                    key.to_string(),
-                    test_runner.publish_package(
-                        (package.0.clone(), package.1.clone()),
-                        BTreeMap::new(),
-                        OwnerRole::None,
-                    ),
-                )
-            })
-            .collect();
+
         let manifest_builder = ManifestBuilder::new().lock_standard_test_fee(account);
+
+        let package_addresses: HashMap<String, PackageAddress> = HashMap::new();
 
         let admin_badge_address =
             test_runner.create_fungible_resource(dec!(1), DIVISIBILITY_NONE, account);
@@ -137,7 +220,7 @@ impl TestEnvironment {
         let j_nft_address = test_runner.create_non_fungible_resource(account);
         let k_nft_address = test_runner.create_non_fungible_resource(account);
 
-        Self {
+        let test_environment = Self {
             test_runner,
             manifest_builder,
             package_addresses,
@@ -157,7 +240,40 @@ impl TestEnvironment {
 
             instruction_counter: INSTRUCTION_COUNTER_INIT,
             instruction_ids_by_label: HashMap::new(),
-        }
+        };
+
+        test_environment
+    }
+
+    /// Compiles and Publishes Packages
+    ///
+    /// IMPORTANT: Prefer usage of TestEnvironment::new(packages_map) over
+    /// TestEnvironment::new(empty_package_map) + test_environment.compile_and_publish_packages,
+    /// since the first results in caching of clean environment states + respective packages,
+    /// speeding up future calls
+    pub fn compile_and_publish_packages(&mut self, packages: HashMap<&str, PathBuf>) {
+        let package_addresses: HashMap<String, PackageAddress> = packages
+            .into_iter()
+            .map(|(package_name, package_dir)| {
+                let cache_result: Option<CompiledPackage> = get_cache(&PACKAGE_CACHE, &package_dir);
+                let compiled_package = match cache_result {
+                    Some(compiled_package) => compiled_package,
+                    None => {
+                        let compiled_package = self.test_runner.compile(&package_dir);
+                        write_cache(&PACKAGE_CACHE, package_dir, compiled_package.clone());
+                        compiled_package
+                    }
+                };
+                let package_address = self.test_runner.publish_package(
+                    compiled_package,
+                    BTreeMap::new(),
+                    OwnerRole::None,
+                );
+                (package_name.to_string(), package_address)
+            })
+            .collect();
+
+        self.package_addresses.extend(package_addresses);
     }
 
     pub fn new_instruction(
@@ -178,6 +294,107 @@ impl TestEnvironment {
             .package_addresses
             .get(package_name)
             .expect(format!("Package {:?} not found", package_name).as_str())
+    }
+
+    /// Creates and retrieves snapshot of the TestEnvironment
+    /// IMPORTANT: The states of the following fields are dropped:
+    /// - MenifestBuilder
+    /// - instruction_counter
+    /// - instruction_ids_by_label
+    pub fn create_snapshot(&self) -> TestEnvironmentSnapshot {
+        TestEnvironmentSnapshot::from(self)
+    }
+}
+
+/// NOTE: This should only be used for single clones,
+/// since it clones by taking a snapshot and then recovering from it.
+/// For the creation of many clones, it is advised to manually snapshot
+/// and then creating as many TestEnvironments as needed from
+/// that snapshot
+impl Clone for TestEnvironment {
+    fn clone(&self) -> Self {
+        self.create_snapshot().revive()
+    }
+}
+
+pub struct TestEnvironmentSnapshot {
+    pub test_runner_snapshot: LedgerSimulatorSnapshot,
+
+    pub package_addresses: HashMap<String, PackageAddress>,
+    pub public_key: Secp256k1PublicKey,
+    pub account: ComponentAddress,
+    pub dapp_definition: ComponentAddress,
+
+    pub admin_badge_address: ResourceAddress,
+    pub a_address: ResourceAddress,
+    pub b_address: ResourceAddress,
+    pub x_address: ResourceAddress,
+    pub y_address: ResourceAddress,
+    pub u_address: ResourceAddress,
+    pub v_address: ResourceAddress,
+    pub j_nft_address: ResourceAddress,
+    pub k_nft_address: ResourceAddress,
+}
+
+impl TestEnvironmentSnapshot {
+    /// Creates snapshot of the TestEnvironment
+    /// IMPORTANT: The states of the following fields are dropped:
+    /// - MenifestBuilder
+    /// - instruction_counter
+    /// - instruction_ids_by_label
+    pub fn from(test_environment: &TestEnvironment) -> TestEnvironmentSnapshot {
+        Self {
+            test_runner_snapshot: test_environment.test_runner.create_snapshot(),
+            package_addresses: test_environment.package_addresses.clone(),
+            public_key: test_environment.public_key.clone(),
+            account: test_environment.account.clone(),
+            dapp_definition: test_environment.dapp_definition.clone(),
+            admin_badge_address: test_environment.admin_badge_address.clone(),
+            a_address: test_environment.a_address.clone(),
+            b_address: test_environment.b_address.clone(),
+            x_address: test_environment.x_address.clone(),
+            y_address: test_environment.y_address.clone(),
+            u_address: test_environment.u_address.clone(),
+            v_address: test_environment.v_address.clone(),
+            j_nft_address: test_environment.j_nft_address.clone(),
+            k_nft_address: test_environment.k_nft_address.clone(),
+        }
+    }
+
+    /// Retrieves a TestEnvironment from the snapshot
+    /// IMPORTANT: The states of the following fields are not recovered:
+    /// - MenifestBuilder
+    /// - instruction_counter
+    /// - instruction_ids_by_label
+    pub fn revive(&self) -> TestEnvironment {
+        TestEnvironment {
+            test_runner: LedgerSimulatorBuilder::new()
+                .with_custom_genesis(CustomGenesis::default(
+                    Epoch::of(1),
+                    CustomGenesis::default_consensus_manager_config(),
+                ))
+                .without_kernel_trace()
+                .build_from_snapshot(self.test_runner_snapshot.clone()),
+            manifest_builder: ManifestBuilder::new().lock_standard_test_fee(self.account),
+
+            package_addresses: self.package_addresses.clone(),
+            public_key: self.public_key.clone(),
+            account: self.account.clone(),
+            dapp_definition: self.dapp_definition.clone(),
+
+            admin_badge_address: self.admin_badge_address.clone(),
+            a_address: self.a_address.clone(),
+            b_address: self.b_address.clone(),
+            x_address: self.x_address.clone(),
+            y_address: self.y_address.clone(),
+            u_address: self.u_address.clone(),
+            v_address: self.v_address.clone(),
+            j_nft_address: self.j_nft_address.clone(),
+            k_nft_address: self.k_nft_address.clone(),
+
+            instruction_counter: INSTRUCTION_COUNTER_INIT,
+            instruction_ids_by_label: HashMap::new(),
+        }
     }
 }
 
@@ -350,7 +567,7 @@ pub trait CreateFungibleResourceAdvanced {
     ) -> ResourceAddress;
 }
 
-impl CreateFungibleResourceAdvanced for TestRunner<NoExtension, InMemorySubstateDatabase> {
+impl CreateFungibleResourceAdvanced for LedgerSimulator<NoExtension, InMemorySubstateDatabase> {
     fn create_fungible_resource_advanced(
         &mut self,
         amount: Decimal,
@@ -390,4 +607,25 @@ fn test_nft_ids() {
             NonFungibleLocalId::Integer((3).into()),
         ])
     )
+}
+
+#[test]
+fn test_test_environment_snapshot() {
+    let packages: HashMap<&str, &str> = HashMap::new();
+    let test_environment = TestEnvironment::new(packages);
+    let test_environment_new = TestEnvironmentSnapshot::from(&test_environment).revive();
+
+    assert!(test_environment.package_addresses == test_environment_new.package_addresses);
+    assert!(test_environment.public_key == test_environment_new.public_key);
+    assert!(test_environment.account == test_environment_new.account);
+    assert!(test_environment.dapp_definition == test_environment_new.dapp_definition);
+    assert!(test_environment.admin_badge_address == test_environment_new.admin_badge_address);
+    assert!(test_environment.a_address == test_environment_new.a_address);
+    assert!(test_environment.b_address == test_environment_new.b_address);
+    assert!(test_environment.x_address == test_environment_new.x_address);
+    assert!(test_environment.y_address == test_environment_new.y_address);
+    assert!(test_environment.u_address == test_environment_new.u_address);
+    assert!(test_environment.v_address == test_environment_new.v_address);
+    assert!(test_environment.j_nft_address == test_environment_new.j_nft_address);
+    assert!(test_environment.k_nft_address == test_environment_new.k_nft_address);
 }
