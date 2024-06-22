@@ -483,7 +483,7 @@ impl Receipt {
     fn instruction_ids(&self, instruction_label: &str) -> Vec<usize> {
         self.instruction_ids_by_label
             .get(&instruction_label.to_string())
-            .unwrap()
+            .expect(&format!("Can't find instruction '{}'", instruction_label))
             .clone()
     }
 }
