@@ -7,12 +7,11 @@ description = "Test environment helper for Radix Scrypto making it easier to wri
 repository = "https://github.com/ociswap/scrypto-testenv"
 
 [dependencies]
-scrypto = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.1.1" }
-transaction = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.1.1" }
-radix-engine = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.1.1" }
-radix-engine-stores = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.1.1" }
-scrypto-unit = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.1.1" }
-lazy_static = "1.4.0"
+scrypto = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.1.2" }
+transaction = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.1.2" }
+radix-engine = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.1.2" }
+radix-engine-stores = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.1.2" }
+scrypto-unit = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.1.2" }
 
 [lib]
 crate-type = ["cdylib", "lib"]
