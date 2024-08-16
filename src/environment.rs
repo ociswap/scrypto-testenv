@@ -267,7 +267,7 @@ impl TestEnvironment {
                 let package_address = self.test_runner.publish_package(
                     compiled_package,
                     BTreeMap::new(),
-                    OwnerRole::None,
+                    OwnerRole::Updatable(rule!(require(self.admin_badge_address))),
                 );
                 (package_name.to_string(), package_address)
             })
