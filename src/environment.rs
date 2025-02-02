@@ -8,7 +8,7 @@ use radix_substate_store_impls::memory_db::InMemorySubstateDatabase;
 use radix_transactions::{builder::ManifestBuilder, prelude::*};
 use scrypto::prelude::*;
 use scrypto_test::ledger_simulator::{
-    CustomGenesis, LedgerSimulator, LedgerSimulatorBuilder, LedgerSimulatorSnapshot,
+    LedgerSimulator, LedgerSimulatorBuilder, LedgerSimulatorSnapshot,
 };
 use std::hash::Hash;
 use std::{
@@ -172,13 +172,7 @@ impl TestEnvironment {
     }
 
     fn generate_new_test_environment() -> TestEnvironment {
-        let mut test_runner = LedgerSimulatorBuilder::new()
-            .with_custom_genesis(CustomGenesis::default(
-                Epoch::of(1),
-                CustomGenesis::default_consensus_manager_config(),
-            ))
-            .without_kernel_trace()
-            .build();
+        let mut test_runner = LedgerSimulatorBuilder::new().without_kernel_trace().build();
 
         let (public_key, _private_key, account) = test_runner.new_allocated_account();
         let (_, _, dapp_definition) = test_runner.new_allocated_account();
@@ -369,10 +363,6 @@ impl TestEnvironmentSnapshot {
     pub fn revive(&self) -> TestEnvironment {
         TestEnvironment {
             test_runner: LedgerSimulatorBuilder::new()
-                .with_custom_genesis(CustomGenesis::default(
-                    Epoch::of(1),
-                    CustomGenesis::default_consensus_manager_config(),
-                ))
                 .without_kernel_trace()
                 .build_from_snapshot(self.test_runner_snapshot.clone()),
             manifest_builder: ManifestBuilder::new().lock_standard_test_fee(self.account),
@@ -406,7 +396,9 @@ pub trait TestHelperExecution {
         let public_key = self.env().public_key;
         let manifest_builder =
             mem::replace(&mut self.env().manifest_builder, ManifestBuilder::new());
-        let manifest = manifest_builder.deposit_batch(account_component).build();
+        let manifest = manifest_builder
+            .deposit_entire_worktop(account_component)
+            .build();
         let preview_receipt = self.env().test_runner.preview_manifest(
             manifest.clone(),
             vec![public_key.clone().into()],
